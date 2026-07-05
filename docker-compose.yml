@@ -1,0 +1,23 @@
+services:
+  whisper-server:
+    build: .
+    image: whisper-server
+    container_name: whisper-server
+    env_file: .env
+    ports:
+      - "47321:47321"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      # /health actively probes the GPU and returns 503 when CUDA is lost.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:47321/health',timeout=5).status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped

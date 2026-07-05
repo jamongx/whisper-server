@@ -1,0 +1,25 @@
+# 환경변수
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Backups
+_backup_pre_medium/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Claude Code
+.claude/

@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "whisper-server"
+version = "0.1.0"
+description = "Local Whisper transcription server for GPU machine"
+authors = ["Jason"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.111"
+uvicorn = { version = "^0.30", extras = ["standard"] }
+openai-whisper = "*"
+python-multipart = "^0.0.9"
+torch = ">=2.3,<2.5"
+python-dotenv = "^1.2.2"
+pydantic-settings = "^2.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
