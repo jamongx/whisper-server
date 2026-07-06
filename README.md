@@ -1,5 +1,12 @@
 # whisper-server
 
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Python](https://img.shields.io/badge/python-3.12-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
+![Whisper](https://img.shields.io/badge/OpenAI-Whisper-412991.svg?logo=openai&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg?logo=docker&logoColor=white)
+![CUDA](https://img.shields.io/badge/CUDA-GPU-76B900.svg?logo=nvidia&logoColor=white)
+
 A lightweight local STT server running [OpenAI Whisper](https://github.com/openai/whisper) behind FastAPI, built for a laptop with a GTX 1660 Ti (6GB VRAM) on Ubuntu.
 
 ## Specs
@@ -125,3 +132,7 @@ docker compose logs -f    # tail logs
 docker compose down       # stop the server
 docker compose restart    # restart the server
 ```
+
+## License
+
+Released under the [MIT License](LICENSE).
