@@ -9,6 +9,8 @@
 
 A lightweight local STT server running [OpenAI Whisper](https://github.com/openai/whisper) behind FastAPI, built for a laptop with a GTX 1660 Ti (6GB VRAM) on Ubuntu.
 
+> 📖 Write-up: [Generate Speaker-Labeled Subtitles with Whisper and pyannote.audio on Ubuntu 24.04](https://jamongx.com/whisper-pyannote-speaker-labeled-subtitles-ubuntu-24-04/) — how I use this server in practice.
+
 ## Specs
 
 | | |
@@ -38,7 +40,7 @@ whisper_server/
 ## Requirements
 
 - Docker
-- NVIDIA driver
+- NVIDIA driver — see [How to Install NVIDIA Driver on Ubuntu 24.04 (GTX 1660 Ti Laptop)](https://jamongx.com/ubuntu-24-04-nvidia-driver-install-gtx-1660-ti/) for the exact setup this server was built on
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
 ### Installing NVIDIA Container Toolkit
@@ -132,6 +134,13 @@ docker compose logs -f    # tail logs
 docker compose down       # stop the server
 docker compose restart    # restart the server
 ```
+
+## Related reading
+
+Field notes from building and running this, on [jamongx.com](https://jamongx.com):
+
+- [Generate Speaker-Labeled Subtitles with Whisper and pyannote.audio on Ubuntu 24.04](https://jamongx.com/whisper-pyannote-speaker-labeled-subtitles-ubuntu-24-04/)
+- [How to Install NVIDIA Driver on Ubuntu 24.04 (GTX 1660 Ti Laptop)](https://jamongx.com/ubuntu-24-04-nvidia-driver-install-gtx-1660-ti/)
 
 ## License
 
