@@ -3,11 +3,11 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Python](https://img.shields.io/badge/python-3.12-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Whisper](https://img.shields.io/badge/OpenAI-Whisper-412991.svg?logo=openai&logoColor=white)
+![faster-whisper](https://img.shields.io/badge/faster--whisper-CTranslate2-412991.svg)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg?logo=docker&logoColor=white)
 ![CUDA](https://img.shields.io/badge/CUDA-GPU-76B900.svg?logo=nvidia&logoColor=white)
 
-A lightweight local STT server running [OpenAI Whisper](https://github.com/openai/whisper) behind FastAPI, built for a laptop with a GTX 1660 Ti (6GB VRAM) on Ubuntu.
+A lightweight local STT server running [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2, int8) behind FastAPI, built for a laptop with a GTX 1660 Ti (6GB VRAM) on Ubuntu.
 
 ## Specs
 
@@ -16,7 +16,7 @@ A lightweight local STT server running [OpenAI Whisper](https://github.com/opena
 | GPU | NVIDIA GTX 1660 Ti 6GB |
 | OS | Ubuntu 24.04 |
 | Runtime | Docker |
-| Default model | Whisper small |
+| Default model | large-v3-turbo (int8) |
 
 ## Project structure
 
@@ -59,12 +59,13 @@ sudo systemctl restart docker
 Copy `.env.example` to `.env` and adjust as needed.
 
 ```env
-WHISPER_MODEL=small          # tiny | base | small | medium | large
+WHISPER_MODEL=large-v3-turbo # faster-whisper name: small | medium | large-v3 | large-v3-turbo | ...
+WHISPER_COMPUTE_TYPE=int8    # int8 | int8_float16 | float16 | float32
 DEFAULT_LANGUAGE=en          # default language code; use "auto" (or leave empty) to auto-detect
-TRANSCRIBE_FP16=false        # enable fp16 inference (requires a capable GPU)
-TRANSCRIBE_BEAM_SIZE=1       # higher = more accurate but slower
-TRANSCRIBE_BEST_OF=1         # higher = more accurate but slower
-CUDA_ALLOC_CONF=max_split_size_mb:256
+TRANSCRIBE_BEAM_SIZE=5       # higher = more accurate but slower
+TRANSCRIBE_BEST_OF=5         # higher = more accurate but slower
+TRANSCRIBE_VAD=true          # skip non-speech with Silero VAD (fewer hallucinations on silence)
+TRANSCRIBE_CONDITION_ON_PREVIOUS_TEXT=false
 
 # Optional decoding hint biasing the model's vocabulary (e.g. product names).
 # Applied to every request unless the caller passes its own initial_prompt.
@@ -77,6 +78,20 @@ CUDA_WATCHDOG_FAILURES=3     # consecutive failures before self-restart
 # Load the model at startup (warms the cache and surfaces GPU problems early).
 WARMUP_ON_START=true
 ```
+
+## Model choice (GTX 1660 Ti, Korean talks)
+
+Measured on 4-minute Korean seminar clips, beam 5, VAD on:
+
+| Model (int8) | Speed | VRAM | GPU ≥95% / peak temp |
+|---|---|---|---|
+| large-v3-turbo | ~12x real time | 1.3 GB | 7 s of 40 s / 80°C |
+| large-v3 | ~5x real time | 2.5 GB | 30 s of 90 s / 82°C |
+
+Quality is close; large-v3 is marginally cleaner. Both are far better than openai-whisper `small`.
+Models are cached in the `hf-cache` volume, so switching `WHISPER_MODEL` only needs `docker compose up -d --force-recreate`.
+
+Requests are serialized (one transcription at a time) — concurrent jobs only thrash a 6 GB GPU.
 
 ## Running
 
@@ -115,7 +130,7 @@ Transcribes an audio file.
 
 ### `GET /health`
 
-Actively probes the GPU. Returns `200` when CUDA is available, `503` when the device is lost.
+Actively probes the GPU with a tiny CUDA round-trip (NVML/`nvidia-smi` can report errors while CUDA still works). Returns `200` when CUDA is available, `503` when the device is lost.
 
 ```json
 // 200 OK

@@ -20,4 +20,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 120s
+    volumes:
+      # Persist downloaded models across rebuilds.
+      - hf-cache:/root/.cache/huggingface
     restart: unless-stopped
+
+volumes:
+  hf-cache:

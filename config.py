@@ -1,5 +1,3 @@
-import os
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,21 +11,28 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Model & decoding
-    whisper_model: str = "small"
+    # Any faster-whisper model name (small, medium, large-v3, large-v3-turbo, ...)
+    # or a path / Hugging Face repo of a CTranslate2-converted model.
+    whisper_model: str = "large-v3"
+    # CTranslate2 quantization: int8 | int8_float16 | float16 | float32
+    whisper_compute_type: str = "int8"
     default_language: str = "en"
-    transcribe_fp16: bool = False
-    transcribe_beam_size: int = 1
-    transcribe_best_of: int = 1
-    cuda_alloc_conf: str = "max_split_size_mb:256"
+    transcribe_beam_size: int = 5
+    transcribe_best_of: int = 5
+    # Silero VAD skips non-speech (silence, room noise) — fewer hallucinations.
+    transcribe_vad: bool = True
+    # Feeding the previous window's text back in helps consistency but lets a
+    # hallucination loop persist; False is the safer default for long talks.
+    transcribe_condition_on_previous_text: bool = False
 
     # Optional decoding hint biasing the model's vocabulary (e.g. product names).
     # Applied to every request unless the caller passes its own initial_prompt.
     default_initial_prompt: str = ""
 
-    # CUDA watchdog — the container can silently lose GPU access (NVML "Unknown
-    # Error") if the host runs `systemd daemon-reload` while the container is up.
-    # The watchdog probes the GPU periodically and, after repeated failures, exits
-    # the process so Docker's restart policy brings up a fresh (working) container.
+    # CUDA watchdog — the container can silently lose GPU access if the host
+    # runs `systemd daemon-reload` while the container is up. The watchdog
+    # probes the GPU periodically and, after repeated failures, exits the
+    # process so Docker's restart policy brings up a fresh (working) container.
     cuda_watchdog_interval: float = 30.0
     cuda_watchdog_failures: int = 3
 
@@ -40,8 +45,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-# Set the CUDA allocator config BEFORE torch is imported anywhere. torch reads
-# PYTORCH_CUDA_ALLOC_CONF when the CUDA context initialises, so this must run
-# first — hence every torch-importing module imports `config` above `torch`.
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", settings.cuda_alloc_conf)
