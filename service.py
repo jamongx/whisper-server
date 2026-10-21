@@ -17,7 +17,7 @@ async def transcribe_upload(
     language: str,
     initial_prompt: str = "",
 ) -> TranscribeResponse:
-    # Whisper reads from a path, so the in-memory upload is spooled to a temp
+    # faster-whisper reads from a path, so the in-memory upload is spooled to a temp
     # file. This is an infrastructure detail hidden from the web layer.
     suffix = Path(filename).suffix if filename else settings.default_fallback_suffix
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
@@ -34,8 +34,8 @@ async def transcribe_upload(
             Segment(start=s["start"], end=s["end"], text=s["text"].strip())
             for s in result.get("segments", [])
         ]
-        # Whisper doesn't report audio length, so derive it from the end of the
-        # last segment (0.0 when there's no speech / no segments).
+        # Duration = end of the last segment (0.0 when there's no speech). The
+        # SRT timecodes come from segment start/end, so this is informational.
         duration = segments[-1].end if segments else 0.0
         return TranscribeResponse(
             text=result["text"].strip(),
