@@ -33,7 +33,10 @@ class Settings(BaseSettings):
     # runs `systemd daemon-reload` while the container is up. The watchdog
     # probes the GPU periodically and, after repeated failures, exits the
     # process so Docker's restart policy brings up a fresh (working) container.
-    cuda_watchdog_interval: float = 30.0
+    # Probing wakes the GPU from its low-power state, so keep the interval long;
+    # a successful transcription counts as a probe.
+    cuda_watchdog_interval: float = 600.0
+    cuda_watchdog_retry: float = 15.0  # re-probe interval once the GPU looks unhealthy
     cuda_watchdog_failures: int = 3
 
     # Load the model at startup (warms the cache and surfaces GPU problems early).

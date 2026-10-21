@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import subprocess
+import time
 
 from config import settings
 
@@ -17,6 +18,25 @@ _model_lock = asyncio.Lock()
 # CTranslate2 models are not safe to drive from concurrent requests on a small
 # GPU (and parallel jobs only thrash VRAM), so transcriptions run one at a time.
 _inference_lock = asyncio.Lock()
+
+# Last known GPU state. Kept up to date by real transcriptions and the watchdog,
+# so /health can answer without touching the GPU — any CUDA call wakes the card
+# out of its low-power state (P8) for ~15-20 s.
+_gpu_ok = True
+_last_success = 0.0  # time.monotonic() of the last successful transcription
+
+
+def gpu_ok() -> bool:
+    return _gpu_ok
+
+
+def set_gpu_ok(ok: bool) -> None:
+    global _gpu_ok
+    _gpu_ok = ok
+
+
+def seconds_since_last_success() -> float:
+    return time.monotonic() - _last_success if _last_success else float("inf")
 
 
 async def get_model():
@@ -71,12 +91,23 @@ def _run(model, tmp_path: str, language: str | None, initial_prompt: str | None)
 
 
 async def transcribe_audio(tmp_path: str, language: str | None, initial_prompt: str | None = None) -> dict:
+    global _last_success
     model = await get_model()
+    loop = asyncio.get_running_loop()
     async with _inference_lock:
-        # Run in a thread pool to avoid blocking the event loop
-        return await asyncio.get_running_loop().run_in_executor(
-            None, lambda: _run(model, tmp_path, language, initial_prompt)
-        )
+        try:
+            # Run in a thread pool to avoid blocking the event loop
+            result = await loop.run_in_executor(
+                None, lambda: _run(model, tmp_path, language, initial_prompt)
+            )
+        except RuntimeError as exc:
+            if is_cuda_error(exc):
+                # Confirm right away instead of waiting for the next watchdog round.
+                set_gpu_ok(await loop.run_in_executor(None, cuda_healthy))
+            raise
+    _last_success = time.monotonic()
+    set_gpu_ok(True)
+    return result
 
 
 def is_cuda_error(exc: Exception) -> bool:
