@@ -103,6 +103,8 @@ bash run.sh
 
 This builds the image and starts the container in the background. Re-running the same command after code changes will trigger a rebuild automatically.
 
+The first start downloads the model from Hugging Face (internet required; ~1.6 GB for large-v3-turbo, ~3 GB for large-v3), so `/health` may take a few minutes to come up. Later starts load it from the `hf-cache` volume.
+
 ## API
 
 Swagger UI is available at `http://localhost:47321/docs` once the server is up.
