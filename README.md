@@ -95,6 +95,8 @@ Models are cached in the `hf-cache` volume, so switching `WHISPER_MODEL` only ne
 
 Requests are serialized (one transcription at a time) — concurrent jobs only thrash a 6 GB GPU.
 
+When idle the GPU drops to P8 (~8 W) with the model still loaded in VRAM, so the first request after a pause is not slowed down.
+
 ## Running
 
 ```bash
@@ -134,7 +136,7 @@ Transcribes an audio file.
 
 ### `GET /health`
 
-Actively probes the GPU with a tiny CUDA round-trip (NVML/`nvidia-smi` can report errors while CUDA still works). Returns `200` when CUDA is available, `503` when the device is lost.
+Returns the last known GPU state without touching the GPU — any CUDA call wakes the card out of its low-power state (P8, ~8 W) for 15–20 s, and Docker polls this endpoint every 30 s. The state is kept current by real transcriptions and by the watchdog, which probes with a tiny CUDA round-trip (NVML/`nvidia-smi` can report errors while CUDA still works) only every `CUDA_WATCHDOG_INTERVAL` seconds (default 10 min) and only when no transcription succeeded in that window. A CUDA error during a request triggers an immediate re-probe; after `CUDA_WATCHDOG_FAILURES` failed probes the process exits and Docker restarts it. Returns `200` when CUDA is available, `503` when the device is lost.
 
 ```json
 // 200 OK
