@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import subprocess
+import sys
 import time
 
 from config import settings
@@ -16,14 +17,15 @@ device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
 _model = None
 _model_lock = asyncio.Lock()
 # CTranslate2 models are not safe to drive from concurrent requests on a small
-# GPU (and parallel jobs only thrash VRAM), so transcriptions run one at a time.
+# GPU (and parallel jobs only thrash VRAM), so GPU jobs — transcription and
+# diarization alike — run one at a time (see run_gpu_job).
 _inference_lock = asyncio.Lock()
 
 # Last known GPU state. Kept up to date by real transcriptions and the watchdog,
 # so /health can answer without touching the GPU — any CUDA call wakes the card
 # out of its low-power state (P8) for ~15-20 s.
 _gpu_ok = True
-_last_success = 0.0  # time.monotonic() of the last successful transcription
+_last_success = 0.0  # time.monotonic() of the last successful GPU job
 
 
 def gpu_ok() -> bool:
@@ -70,7 +72,9 @@ def load_audio(path: str) -> np.ndarray:
     return np.frombuffer(pcm, np.int16).astype(np.float32) / 32768.0
 
 
-def _run(model, tmp_path: str, language: str | None, initial_prompt: str | None) -> dict:
+def _run(
+    model, tmp_path: str, language: str | None, initial_prompt: str | None, word_timestamps: bool
+) -> dict:
     segments, info = model.transcribe(
         load_audio(tmp_path),
         language=language,
@@ -79,9 +83,17 @@ def _run(model, tmp_path: str, language: str | None, initial_prompt: str | None)
         initial_prompt=initial_prompt or None,
         vad_filter=settings.transcribe_vad,
         condition_on_previous_text=settings.transcribe_condition_on_previous_text,
+        word_timestamps=word_timestamps,
     )
     # `segments` is a lazy generator — decoding happens while iterating.
-    segs = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
+    segs = []
+    for s in segments:
+        seg = {"start": s.start, "end": s.end, "text": s.text}
+        if word_timestamps:
+            # Words keep Whisper's leading space (" 안녕하세요") so callers can
+            # rebuild the text by plain concatenation.
+            seg["words"] = [{"start": w.start, "end": w.end, "word": w.word} for w in s.words or []]
+        segs.append(seg)
     return {
         "text": "".join(s["text"] for s in segs),
         "language": info.language,
@@ -90,24 +102,42 @@ def _run(model, tmp_path: str, language: str | None, initial_prompt: str | None)
     }
 
 
-async def transcribe_audio(tmp_path: str, language: str | None, initial_prompt: str | None = None) -> dict:
+async def run_gpu_job(fn):
+    """Run a blocking GPU job in the thread pool, one at a time.
+
+    Shared by transcription and diarization so the two never compete for the
+    6 GB card. A success records the GPU as healthy (the watchdog then skips its
+    probe); a CUDA error is confirmed with an immediate probe. Out-of-memory is
+    a property of the input, not a broken GPU, so it leaves the state alone.
+    """
     global _last_success
-    model = await get_model()
     loop = asyncio.get_running_loop()
     async with _inference_lock:
         try:
-            # Run in a thread pool to avoid blocking the event loop
-            result = await loop.run_in_executor(
-                None, lambda: _run(model, tmp_path, language, initial_prompt)
-            )
+            result = await loop.run_in_executor(None, fn)
         except RuntimeError as exc:
-            if is_cuda_error(exc):
+            if is_cuda_error(exc) and not is_out_of_memory(exc):
                 # Confirm right away instead of waiting for the next watchdog round.
                 set_gpu_ok(await loop.run_in_executor(None, cuda_healthy))
             raise
     _last_success = time.monotonic()
     set_gpu_ok(True)
     return result
+
+
+def gpu_busy() -> bool:
+    """True while a transcription or diarization holds the GPU."""
+    return _inference_lock.locked()
+
+
+async def transcribe_audio(
+    tmp_path: str,
+    language: str | None,
+    initial_prompt: str | None = None,
+    word_timestamps: bool = False,
+) -> dict:
+    model = await get_model()
+    return await run_gpu_job(lambda: _run(model, tmp_path, language, initial_prompt, word_timestamps))
 
 
 def is_cuda_error(exc: Exception) -> bool:
@@ -117,8 +147,23 @@ def is_cuda_error(exc: Exception) -> bool:
     return "cuda" in msg or "cublas" in msg or "cudnn" in msg or "device-side" in msg
 
 
+def is_out_of_memory(exc: Exception) -> bool:
+    """GPU out-of-memory (torch.OutOfMemoryError, CTranslate2 "out of memory").
+    The device still works; the job was just too large for the free VRAM."""
+    return "out of memory" in str(exc).lower()
+
+
 def clear_cuda_cache() -> None:
-    """CTranslate2 manages its own allocator cache; nothing to release per request."""
+    """Hand torch's cached VRAM back to the driver after a request.
+
+    CTranslate2 manages its own allocator cache. torch (pyannote) keeps freed
+    blocks cached, which would leave the diarization peak resident next to
+    Whisper. Only acts once diarization has initialised torch's CUDA context,
+    so plain transcriptions never import torch.
+    """
+    torch = sys.modules.get("torch")
+    if torch is not None and torch.cuda.is_initialized():
+        torch.cuda.empty_cache()
 
 
 def cuda_healthy() -> bool:

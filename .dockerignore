@@ -20,3 +20,8 @@ __pycache__/
 
 # 문서
 README.md
+
+# 개발용 (참고 스크립트·테스트는 이미지에 넣지 않음)
+scripts/
+tests/
+.pytest_cache/

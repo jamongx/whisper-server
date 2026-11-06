@@ -5,7 +5,7 @@ description = "Local Whisper transcription server for GPU machine"
 authors = ["Jason"]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12,<3.15"
 fastapi = "^0.111"
 uvicorn = { version = "^0.30", extras = ["standard"] }
 faster-whisper = "^1.1"
@@ -14,6 +14,17 @@ nvidia-cudnn-cu12 = "^9.1"
 python-multipart = "^0.0.9"
 python-dotenv = "^1.2.2"
 pydantic-settings = "^2.4"
+# Speaker diarization (POST /diarize). torch 2.10 is the last release whose
+# default PyPI wheel targets CUDA 12 (2.11+ ship CUDA 13), matching the
+# cuBLAS/cuDNN 12.x/9.x that CTranslate2 loads. torchcodec has no torch pin of
+# its own, so it must be held to the release built for torch 2.10.
+pyannote-audio = "^4.0.7"
+torch = "~2.10.0"
+torchaudio = "~2.10.0"
+torchcodec = "~0.10.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3"
 
 [build-system]
 requires = ["poetry-core"]
