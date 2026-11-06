@@ -215,6 +215,8 @@ python scripts/merge_diarization.py diarization.json part1.json@0 part2.json@360
 
 The merge assigns each word to the speaker turn it overlaps longest, starts a new cue whenever the speaker changes, and writes cues as `[SPEAKER_00] text`. The server never merges; the script is a reference implementation (standard library only).
 
+**Measured** (92-minute Korean meeting, GTX 1660 Ti, default batch sizes 32): diarization 5.2 min including the first model load (12 s) and upload — about 18x real time; peak VRAM 3.9 GB with Whisper resident (Whisper alone ~1.2–1.4 GB); peak 77°C; container RAM peak ~4.5 GB. Three speakers found. Afterwards the GPU returns to P8 with ~80 MB more resident VRAM (torch context).
+
 **Long requests.** Diarizing a 1–2 hour recording takes minutes and holds the GPU lock, so a `/transcribe` sent meanwhile waits for it. Give clients a generous read timeout (e.g. `curl --max-time 3600`). The upload is read into memory, and very long files (3–4 h) need several GB of RAM for clustering — measure before relying on them.
 
 ### `GET /health`
