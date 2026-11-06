@@ -3,7 +3,12 @@ services:
     build: .
     image: whisper-server
     container_name: whisper-server
-    env_file: .env
+    env_file:
+      - .env
+      # Secrets kept outside the repo (HF_TOKEN for /diarize); optional, and
+      # values here override .env.
+      - path: ${HOME}/.config/secrets/whisper_server.env
+        required: false
     ports:
       - "47321:47321"
     deploy:

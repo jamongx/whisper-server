@@ -86,7 +86,7 @@ CUDA_WATCHDOG_FAILURES=3     # consecutive failures before self-restart
 # Speaker diarization (POST /diarize). The model is gated: accept its terms on
 # huggingface.co with the account that owns the token. Leave HF_TOKEN empty to
 # run without diarization (/diarize then returns 503). Never commit the value.
-HF_TOKEN=
+HF_TOKEN=                    # or keep it in ~/.config/secrets/whisper_server.env (see below)
 DIARIZE_MODEL=pyannote/speaker-diarization-community-1
 DIARIZE_SEGMENTATION_BATCH_SIZE=0  # 0 = pipeline default; larger = faster, more VRAM
 DIARIZE_EMBEDDING_BATCH_SIZE=0
@@ -187,7 +187,14 @@ Finds who spoke when. Send the **whole recording in one request** — not the 60
 
 ## Speaker diarization
 
-**Setup.** Accept the terms of [`pyannote/speaker-diarization-community-1`](https://huggingface.co/pyannote/speaker-diarization-community-1) on Hugging Face, create a read token, and put it in `.env` as `HF_TOKEN`. Without it the server starts normally and only `/diarize` answers 503. The pipeline (a few tens of MB) is downloaded on the first `/diarize` call into the `hf-cache` volume and loaded on first use — never at startup, so days without diarization keep the GPU idle exactly as before.
+**Setup.** Accept the terms of [`pyannote/speaker-diarization-community-1`](https://huggingface.co/pyannote/speaker-diarization-community-1) on Hugging Face, create a read token, and store it outside the repo:
+
+```bash
+mkdir -p -m 700 ~/.config/secrets
+(umask 077; echo "HF_TOKEN=hf_..." > ~/.config/secrets/whisper_server.env)
+```
+
+`docker-compose.yml` loads that file after `.env` when it exists (`HF_TOKEN` in `.env` works too). Without it the server starts normally and only `/diarize` answers 503. The pipeline (a few tens of MB) is downloaded on the first `/diarize` call into the `hf-cache` volume and loaded on first use — never at startup, so days without diarization keep the GPU idle exactly as before.
 
 **Why community-1.** It is pyannote's current open pipeline (pyannote.audio 4, CC-BY-4.0) and runs fully locally; it improves speaker counting and assignment over 3.1 and provides exclusive diarization for aligning with transcripts. `speaker-diarization-precision` is newer but runs on pyannoteAI's cloud, so it is not an option for confidential recordings.
 
