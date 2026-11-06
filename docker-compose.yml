@@ -14,7 +14,7 @@ services:
               count: all
               capabilities: [gpu]
     healthcheck:
-      # /health actively probes the GPU and returns 503 when CUDA is lost.
+      # /health reports the last known GPU state (no GPU call) and returns 503 when CUDA is lost.
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:47321/health',timeout=5).status==200 else 1)"]
       interval: 30s
       timeout: 10s

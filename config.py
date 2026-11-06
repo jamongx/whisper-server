@@ -39,6 +39,17 @@ class Settings(BaseSettings):
     cuda_watchdog_retry: float = 15.0  # re-probe interval once the GPU looks unhealthy
     cuda_watchdog_failures: int = 3
 
+    # Speaker diarization (POST /diarize) — pyannote.audio, loaded on first use.
+    # The model repo is gated: accept its terms on Hugging Face with the account
+    # that owns HF_TOKEN. Without a token the server still runs; only /diarize
+    # answers 503. Never log this value.
+    hf_token: str = ""
+    diarize_model: str = "pyannote/speaker-diarization-community-1"
+    # 0 keeps the batch sizes from the pipeline's config.yaml; set a positive
+    # value to override (larger = faster on long files, more VRAM).
+    diarize_segmentation_batch_size: int = 0
+    diarize_embedding_batch_size: int = 0
+
     # Load the model at startup (warms the cache and surfaces GPU problems early).
     warmup_on_start: bool = True
 
